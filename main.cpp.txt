@@ -1,0 +1,186 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <set>
+#include <map>
+#include <algorithm>
+#include <cstring>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+
+struct Packet {
+    std::string symbol;
+    char side;
+    int quantity;
+    int price;
+    int sequence;
+};
+
+int readIntBigEndian(const uint8_t* buffer) {
+    return (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
+}
+
+Packet parsePacket(const uint8_t* buffer) {
+    Packet p;
+    p.symbol = std::string(buffer, buffer + 4);  // Extract the symbol (first 4 bytes)
+    p.side = buffer[4];                         // Buy/Sell side
+    p.quantity = readIntBigEndian(buffer + 5);   // Quantity (next 4 bytes)
+    p.price = readIntBigEndian(buffer + 9);      // Price (next 4 bytes)
+    p.sequence = readIntBigEndian(buffer + 13);  // Sequence (next 4 bytes)
+    return p;
+}
+
+void sendRequest(int sock, uint8_t callType, uint8_t resendSeq = 0) {
+    uint8_t request[2] = {callType, resendSeq};
+    send(sock, request, 2, 0);
+}
+
+int connectToServer() {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    sockaddr_in server{};
+    server.sin_family = AF_INET;
+    server.sin_port = htons(3000);  // Assume port 3000
+    inet_pton(AF_INET, "127.0.0.1", &server.sin_addr);  // Connect to local server
+
+    if (connect(sock, (sockaddr*)&server, sizeof(server)) < 0) {
+        perror("Connection failed");
+        exit(EXIT_FAILURE);
+    }
+
+    return sock;
+}
+
+std::vector<Packet> receivePackets(int sock) {
+    std::vector<Packet> packets;
+    uint8_t buffer[17];
+    ssize_t bytesRead;
+
+    while ((bytesRead = recv(sock, buffer, 17, MSG_WAITALL)) == 17) {
+        Packet p = parsePacket(buffer);
+        packets.push_back(p);
+    }
+
+    return packets;
+}
+
+std::set<int> findMissingSequences(const std::vector<Packet>& packets) {
+    std::set<int> missing;
+    if (packets.empty()) return missing;
+
+    std::set<int> received;
+    int maxSeq = 0;
+    for (const auto& p : packets) {
+        received.insert(p.sequence);
+        if (p.sequence > maxSeq) maxSeq = p.sequence;
+    }
+
+    for (int i = 1; i < maxSeq; ++i) {
+        if (!received.count(i)) missing.insert(i);
+    }
+
+    return missing;
+}
+
+void writeJson(const std::vector<Packet>& packets, const std::string& filename) {
+    json j = json::array();
+    for (const auto& p : packets) {
+        j.push_back({
+            {"symbol", p.symbol},
+            {"side", std::string(1, p.side)},  // Convert char to string
+            {"quantity", p.quantity},
+            {"price", p.price},
+            {"sequence", p.sequence}
+        });
+    }
+    std::ofstream out(filename);
+    out << j.dump(2);  // Pretty print with indent level of 2
+}
+
+int main() {
+    std::vector<Packet> allPackets;
+
+    // Initial stream
+    int sock = connectToServer();
+    sendRequest(sock, 1);  // Request initial data
+    auto packets = receivePackets(sock);
+    close(sock);
+
+    std::map<int, Packet> packetMap;
+    for (const auto& p : packets) packetMap[p.sequence] = p;
+
+    auto missing = findMissingSequences(packets);
+
+    // Resend requests
+    for (int seq : missing) {
+        int rsock = connectToServer();
+        sendRequest(rsock, 2, seq);  // Request specific missing sequence
+        auto resend = receivePackets(rsock);
+        if (!resend.empty()) {
+            packetMap[resend[0].sequence] = resend[0];
+        }
+        close(rsock);
+    }
+
+    // Collect sorted packets
+    for (const auto& [seq, packet] : packetMap) {
+        allPackets.push_back(packet);
+    }
+
+    // Write to JSON file
+    writeJson(allPackets, "output.json");
+    std::cout << "Output written to output.json\n";
+
+    return 0;
+}
+Explanation:
+
+The program connects to a server,retrieves stock trade packets,
+detects any missing sequence numbers, 
+requests the missing packets,
+and outputs the data in JSON format. 
+
+o    "symbol": "AMZN",
+    "side": "B",
+    "quantity": 70,
+    "price": 200,
+    "sequence": 8
+  },
+  {
+    "symbol": "AMZN",
+    "side": "S",
+    "quantity": 50,
+    "price": 210,
+    "sequence": 9
+  },
+  {
+    "symbol": "AMZN",
+    "side": "S",
+    "quantity": 10,
+    "price": 215,
+    "sequence": 10
+  }
+]
+
+Explanation:
+
+Symbol: The stock symbol for the packet (e.g., "AAPL", "MSFT", "AMZN").
+
+Side: Indicates whether it's a buy ('B') or sell ('S') packet.
+
+Quantity: The quantity of stock in the packet.
+
+Price: The price at which the stock is being bought or sold.
+
+Sequence: The sequence number that represents the order of the packet.
+
+In this mock output, the sequence numbers are continuous, and no packets were missing. 
+
+If missing sequences were detected, the program would request the missing packets and they would be included in the final sorted list.

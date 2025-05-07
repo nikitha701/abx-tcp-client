@@ -1,0 +1,111 @@
+output.json
+
+[
+  {
+    "symbol": "AAPL",
+    "side": "B",
+    "quantity": 50,
+    "price": 100,
+    "sequence": 1
+  },
+  {
+    "symbol": "AAPL",
+    "side": "B",
+    "quantity": 30,
+    "price": 98,
+    "sequence": 2
+  },
+  {
+    "symbol": "AAPL",
+    "side": "S",
+    "quantity": 20,
+    "price": 105,
+    "sequence": 3
+  },
+  {
+    "symbol": "AAPL",
+    "side": "S",
+    "quantity": 10,
+    "price": 106,
+    "sequence": 4
+  },
+  {
+  "symbol": "GOOG",
+  "side": "B",
+  "quantity": 40,
+  "price": 150,
+  "Sequence": 5
+  },
+  {
+  "symbol": "GOOG",
+  "side": "S",
+  "quantity": 30,
+  "price": 145,
+  "Sequence": 6
+  },
+  {
+  "symbol": "GOOG",
+  "side": "S",
+  "quantity": 20,
+  "price": 148,
+  "Sequence": 7
+  },
+  {
+    "symbol": "MSFT",
+    "side": "B",
+    "quantity": 40,
+    "price": 50,
+    "sequence": 5
+  },
+  {
+    "symbol": "MSFT",
+    "side": "S",
+    "quantity": 30,
+    "price": 55,
+    "sequence": 6
+  },
+  {
+    "symbol": "MSFT",
+    "side": "B",
+    "quantity": 15,
+    "price": 53,
+    "sequence": 7
+  },
+  {
+    "symbol": "AMZN",
+    "side": "B",
+    "quantity": 70,
+    "price": 200,
+    "sequence": 8
+  },
+  {
+    "symbol": "AMZN",
+    "side": "S",
+    "quantity": 50,
+    "price": 210,
+    "sequence": 9
+  },
+  {
+    "symbol": "AMZN",
+    "side": "S",
+    "quantity": 10,
+    "price": 215,
+    "sequence": 10
+  }
+]
+
+Explanation:
+
+Symbol: The stock symbol for the packet (e.g., "AAPL", "MSFT", "AMZN").
+
+Side: Indicates whether it's a buy ('B') or sell ('S') packet.
+
+Quantity: The quantity of stock in the packet.
+
+Price: The price at which the stock is being bought or sold.
+
+Sequence: The sequence number that represents the order of the packet.
+
+In this mock output, the sequence numbers are continuous, and no packets were missing. 
+
+If missing sequences were detected, the program would request the missing packets and they would be included in the final sorted list.
